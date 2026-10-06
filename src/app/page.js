@@ -4,13 +4,9 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import QRCode from 'react-qr-code';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-const getSupabase = () => {
-  if (!supabaseUrl || !supabaseKey) return null;
-  return createClient(supabaseUrl, supabaseKey);
-};
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function Home() {
   const [customer, setCustomer] = useState(null);
@@ -26,8 +22,6 @@ export default function Home() {
 
   async function fetchCustomer(id) {
     try {
-      const supabase = getSupabase();
-      if (!supabase) return;
       const { data } = await supabase.from('customers').select('*').eq('id', id).single();
       if (data) setCustomer(data);
     } catch (e) {
@@ -40,9 +34,8 @@ export default function Home() {
     setLoading(true);
     setErrorMsg('');
 
-    const supabase = getSupabase();
-    if (!supabase) {
-      setErrorMsg('Errore: Variabili d\'ambiente Supabase non trovate su Vercel.');
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      setErrorMsg('Attenzione: Le variabili d\'ambiente Supabase non sono ancora impostate su Vercel.');
       setLoading(false);
       return;
     }
@@ -63,7 +56,7 @@ export default function Home() {
         setCustomer(data);
       }
     } catch (err) {
-      setErrorMsg('Errore di connessione. Riprova tra poco.');
+      setErrorMsg('Errore di connessione al database.');
     } finally {
       setLoading(false);
     }

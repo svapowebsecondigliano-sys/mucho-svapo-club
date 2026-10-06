@@ -3,15 +3,9 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-export const dynamic = 'force-dynamic';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-const getSupabase = () => {
-  if (!supabaseUrl || !supabaseKey) return null;
-  return createClient(supabaseUrl, supabaseKey);
-};
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function Cassa() {
   const [customer, setCustomer] = useState(null);
@@ -49,8 +43,6 @@ export default function Cassa() {
 
   async function loadCustomer(id) {
     try {
-      const supabase = getSupabase();
-      if (!supabase) return;
       const { data } = await supabase.from('customers').select('*').eq('id', id).single();
       if (data) setCustomer(data);
     } catch (e) {
@@ -66,12 +58,6 @@ export default function Cassa() {
     if (pointsToEarn <= 0) return;
 
     try {
-      const supabase = getSupabase();
-      if (!supabase) {
-        setMessage('Errore: Chiavi Supabase mancanti.');
-        return;
-      }
-
       const { error } = await supabase.rpc('add_points', {
         cust_id: customer.id,
         pts: pointsToEarn,
