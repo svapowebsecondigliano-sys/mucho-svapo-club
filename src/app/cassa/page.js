@@ -82,11 +82,9 @@ export default function Cassa() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const { data, error } = await supabase.rpc('get_customer', {
+        p_customer_id: id,
+      });
 
       if (error) {
         console.error('Errore caricamento cliente:', error);
