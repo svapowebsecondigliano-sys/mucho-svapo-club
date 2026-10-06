@@ -101,17 +101,11 @@ export default function Home() {
     try {
       const qrId = getQrId();
 
-      const { data, error } = await supabase
-        .from('customers')
-        .insert([
-          {
-            full_name: cleanName,
-            phone: cleanPhone,
-            qr_code_id: qrId,
-          },
-        ])
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc('create_customer', {
+        p_full_name: cleanName,
+        p_phone: cleanPhone,
+        p_qr_code_id: qrId,
+      });
 
       if (error) {
         console.error('Errore Supabase creazione tessera:', error);
