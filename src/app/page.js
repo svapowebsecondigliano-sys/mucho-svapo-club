@@ -35,7 +35,7 @@ export default function Home() {
     setErrorMsg('');
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-      setErrorMsg('Attenzione: Le variabili d\'ambiente Supabase non sono ancora impostate su Vercel.');
+      setErrorMsg("Attenzione: Le variabili d'ambiente Supabase non sono ancora impostate su Vercel.");
       setLoading(false);
       return;
     }
