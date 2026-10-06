@@ -1,10 +1,17 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
-const supabase = createClient(supabaseUrl, supabaseKey);
+export const dynamic = 'force-dynamic';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+const getSupabase = () => {
+  if (!supabaseUrl || !supabaseKey) return null;
+  return createClient(supabaseUrl, supabaseKey);
+};
 
 export default function Cassa() {
   const [customer, setCustomer] = useState(null);
@@ -12,17 +19,26 @@ export default function Cassa() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     let scannerInstance = null;
 
-    // Carica lo scanner solo sul browser del client per non bloccare la build Next.js
     import('html5-qrcode').then(({ Html5QrcodeScanner }) => {
-      scannerInstance = new Html5QrcodeScanner('reader', { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-      
-      scannerInstance.render((decodedText) => {
-        loadCustomer(decodedText);
-        scannerInstance.clear();
-      }, () => {});
-    }).catch(err => console.error('Errore scanner:', err));
+      const scanner = new Html5QrcodeScanner(
+        'reader',
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        false
+      );
+      scannerInstance = scanner;
+
+      scanner.render(
+        (decodedText) => {
+          loadCustomer(decodedText);
+          scanner.clear().catch(() => {});
+        },
+        () => {}
+      );
+    }).catch((err) => console.error('Errore scanner:', err));
 
     return () => {
       if (scannerInstance) {
@@ -32,8 +48,14 @@ export default function Cassa() {
   }, []);
 
   async function loadCustomer(id) {
-    const { data } = await supabase.from('customers').select('*').eq('id', id).single();
-    if (data) setCustomer(data);
+    try {
+      const supabase = getSupabase();
+      if (!supabase) return;
+      const { data } = await supabase.from('customers').select('*').eq('id', id).single();
+      if (data) setCustomer(data);
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   async function handleAddPoints(e) {
@@ -43,18 +65,28 @@ export default function Cassa() {
 
     if (pointsToEarn <= 0) return;
 
-    const { error } = await supabase.rpc('add_points', {
-      cust_id: customer.id,
-      pts: pointsToEarn,
-      amount: parsedAmount
-    });
+    try {
+      const supabase = getSupabase();
+      if (!supabase) {
+        setMessage('Errore: Chiavi Supabase mancanti.');
+        return;
+      }
 
-    if (!error) {
-      setMessage(`Accreditati +${pointsToEarn} Punti con successo!`);
-      setCustomer(prev => ({ ...prev, points_balance: prev.points_balance + pointsToEarn }));
-      setAmount('');
-    } else {
-      setMessage('Errore durante l\'accredito');
+      const { error } = await supabase.rpc('add_points', {
+        cust_id: customer.id,
+        pts: pointsToEarn,
+        amount: parsedAmount
+      });
+
+      if (!error) {
+        setMessage(`Accreditati +${pointsToEarn} Punti con successo!`);
+        setCustomer(prev => ({ ...prev, points_balance: (prev.points_balance || 0) + pointsToEarn }));
+        setAmount('');
+      } else {
+        setMessage('Errore durante l\'accredito: ' + error.message);
+      }
+    } catch (err) {
+      setMessage('Errore di connessione');
     }
   }
 

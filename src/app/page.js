@@ -1,11 +1,16 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import QRCode from 'react-qr-code';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
+const getSupabase = () => {
+  if (!supabaseUrl || !supabaseKey) return null;
+  return createClient(supabaseUrl, supabaseKey);
+};
 
 export default function Home() {
   const [customer, setCustomer] = useState(null);
@@ -20,8 +25,14 @@ export default function Home() {
   }, []);
 
   async function fetchCustomer(id) {
-    const { data } = await supabase.from('customers').select('*').eq('id', id).single();
-    if (data) setCustomer(data);
+    try {
+      const supabase = getSupabase();
+      if (!supabase) return;
+      const { data } = await supabase.from('customers').select('*').eq('id', id).single();
+      if (data) setCustomer(data);
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   async function handleRegister(e) {
@@ -29,28 +40,33 @@ export default function Home() {
     setLoading(true);
     setErrorMsg('');
 
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-      setErrorMsg('Errore: Variabili d\'ambiente Supabase non presenti su Vercel.');
+    const supabase = getSupabase();
+    if (!supabase) {
+      setErrorMsg('Errore: Variabili d\'ambiente Supabase non trovate su Vercel.');
       setLoading(false);
       return;
     }
 
-    const qrId = 'MS-' + Math.random().toString(36).substring(2, 9).toUpperCase();
-    
-    const { data, error } = await supabase
-      .from('customers')
-      .insert([{ full_name: name, phone: phone, qr_code_id: qrId }])
-      .select()
-      .single();
+    try {
+      const qrId = 'MS-' + Math.random().toString(36).substring(2, 9).toUpperCase();
 
-    if (error) {
-      console.error(error);
-      setErrorMsg('Errore Supabase: ' + error.message);
-    } else if (data) {
-      localStorage.setItem('mucho_svapo_user_id', data.id);
-      setCustomer(data);
+      const { data, error } = await supabase
+        .from('customers')
+        .insert([{ full_name: name, phone: phone, qr_code_id: qrId }])
+        .select()
+        .single();
+
+      if (error) {
+        setErrorMsg(`Errore Supabase: ${error.message}`);
+      } else if (data) {
+        localStorage.setItem('mucho_svapo_user_id', data.id);
+        setCustomer(data);
+      }
+    } catch (err) {
+      setErrorMsg('Errore di connessione. Riprova tra poco.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   if (customer) {
