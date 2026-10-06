@@ -3,9 +3,9 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import QRCode from 'react-qr-code';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl || '', supabaseKey || '');
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function Home() {
   const [customer, setCustomer] = useState(null);
@@ -29,8 +29,8 @@ export default function Home() {
     setLoading(true);
     setErrorMsg('');
 
-    if (!supabaseUrl || !supabaseKey) {
-      setErrorMsg('Errore: Variabili d\'ambiente Supabase mancanti su Vercel!');
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+      setErrorMsg('Errore: Variabili d\'ambiente Supabase non presenti su Vercel.');
       setLoading(false);
       return;
     }

@@ -1,12 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Html5QrcodeScanner } from 'html5-qrcode';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function Cassa() {
   const [customer, setCustomer] = useState(null);
@@ -14,14 +12,23 @@ export default function Cassa() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    const scanner = new Html5QrcodeScanner('reader', { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-    
-    scanner.render((decodedText) => {
-      loadCustomer(decodedText);
-      scanner.clear();
-    }, () => {});
+    let scannerInstance = null;
 
-    return () => { scanner.clear().catch(() => {}); };
+    // Carica lo scanner solo sul browser del client per non bloccare la build Next.js
+    import('html5-qrcode').then(({ Html5QrcodeScanner }) => {
+      scannerInstance = new Html5QrcodeScanner('reader', { fps: 10, qrbox: { width: 250, height: 250 } }, false);
+      
+      scannerInstance.render((decodedText) => {
+        loadCustomer(decodedText);
+        scannerInstance.clear();
+      }, () => {});
+    }).catch(err => console.error('Errore scanner:', err));
+
+    return () => {
+      if (scannerInstance) {
+        scannerInstance.clear().catch(() => {});
+      }
+    };
   }, []);
 
   async function loadCustomer(id) {
@@ -52,52 +59,3 @@ export default function Cassa() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-900 text-white p-4 flex flex-col items-center">
-      <h1 className="text-xl font-bold text-yellow-500 mb-4">Cassa - Mucho Svapo Club</h1>
-
-      {!customer ? (
-        <div className="w-full max-w-sm bg-neutral-800 p-4 rounded-xl">
-          <div id="reader" className="w-full"></div>
-          <p className="text-xs text-center text-gray-400 mt-2">Inquadra il QR Code dello smartphone del cliente</p>
-        </div>
-      ) : (
-        <div className="w-full max-w-sm bg-neutral-800 p-6 rounded-2xl border border-neutral-700">
-          <p className="text-lg font-bold">{customer.full_name}</p>
-          <p className="text-xs text-gray-400 mb-4">Saldo attuale: <span className="text-yellow-400 font-bold">{customer.points_balance} PTS</span></p>
-
-          <form onSubmit={handleAddPoints} className="space-y-4">
-            <div>
-              <label className="text-xs text-gray-400">Importo speso (€)</label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                placeholder="es. 18.50"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-3 text-2xl font-bold text-yellow-400 text-center mt-1 focus:outline-none"
-              />
-            </div>
-            
-            <p className="text-xs text-center text-gray-400">
-              Punti da accreditare: <strong className="text-white">{amount ? Math.floor(parseFloat(amount) || 0) : 0} PTS</strong>
-            </p>
-
-            <button type="submit" className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-bold py-3 rounded-lg">
-              Conferma e Accredita Punti
-            </button>
-          </form>
-
-          {message && <p className="text-sm text-green-400 font-semibold text-center mt-4">{message}</p>}
-
-          <button 
-            onClick={() => { setCustomer(null); setMessage(''); }}
-            className="w-full mt-4 bg-neutral-700 text-xs py-2 rounded-lg text-gray-300"
-          >
-            Scansiona altro cliente
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
