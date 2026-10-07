@@ -22,6 +22,13 @@ function validPhone(value) {
   return /^\d{8,15}$/.test(value.replace(/[\s().+-]/g, ''));
 }
 
+const REWARDS = [
+  { code: 'COTONE_DRIP', points: 60, name: 'Filtri cotone + Drip Tip' },
+  { code: 'LACCIO_COPRI_DRIP', points: 70, name: 'Laccio porta sigaretta + Copri Drip Tip' },
+  { code: 'RESISTENZE_2', points: 110, name: '2 resistenze' },
+  { code: 'SCONTO_15_DEVICE', points: 300, name: '15% sconto su dispositivo' },
+];
+
 export default function Home() {
   const [customer, setCustomer] = useState(null);
   const [mode, setMode] = useState('register');
@@ -223,6 +230,30 @@ export default function Home() {
 
           <p className="text-sm font-semibold text-gray-300">{customer.full_name}</p>
           <p className="text-xs text-gray-500 mb-5">{customer.phone}</p>
+          <div className="text-left mb-5">
+            <h2 className="text-sm font-bold text-white mb-3">🎁 I tuoi premi</h2>
+            <div className="space-y-2">
+              {REWARDS.map((reward) => {
+                const balance = customer.points_balance ?? 0;
+                const available = balance >= reward.points;
+                return (
+                  <div key={reward.code} className={`rounded-xl border p-3 ${available ? 'border-yellow-500/60 bg-yellow-500/10' : 'border-neutral-700 bg-neutral-900/60'}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">{reward.name}</p>
+                        <p className="text-xs text-gray-400 mt-1">{reward.points} PTS</p>
+                      </div>
+                      <span className={`text-xs font-bold whitespace-nowrap ${available ? 'text-yellow-400' : 'text-gray-500'}`}>
+                        {available ? 'Disponibile' : `Mancano ${reward.points - balance}`}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-gray-500 mt-3 text-center">I premi vengono riscattati direttamente in cassa.</p>
+          </div>
+
 
           <button onClick={logout} className="w-full bg-neutral-700 hover:bg-neutral-600 text-sm py-3 rounded-lg">
             Esci dalla tessera
