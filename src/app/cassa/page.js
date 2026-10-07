@@ -46,6 +46,8 @@ export default function Cassa() {
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [redeeming, setRedeeming] = useState('');
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
@@ -132,6 +134,18 @@ export default function Cassa() {
     setMessage('');
   }
 
+  async function loadHistory(customerId) {
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    setHistoryLoading(true);
+    const { data, error } = await supabase.rpc('get_customer_history', {
+      p_customer_id: customerId,
+    });
+    if (!error) setHistory(data || []);
+    else console.error('Errore storico cliente:', error);
+    setHistoryLoading(false);
+  }
+
   async function loadCustomer(id) {
     const supabase = getSupabaseClient();
 
@@ -153,6 +167,7 @@ export default function Cassa() {
 
       setCustomer(data);
       setMessage('');
+      loadHistory(data.id);
     } catch (error) {
       console.error('Errore connessione:', error);
       setMessage('Errore di connessione al database.');
@@ -202,6 +217,7 @@ export default function Cassa() {
         points_balance: (previous.points_balance || 0) + pointsToEarn,
       }));
       setAmount('');
+      await loadHistory(customer.id);
     } catch (error) {
       console.error('Errore inatteso accredito:', error);
       setMessage('Errore di connessione.');
@@ -234,6 +250,7 @@ export default function Cassa() {
       }
       setCustomer((previous) => ({ ...previous, points_balance: data.new_balance }));
       setMessage(`Premio riscattato: ${data.reward}. Scalati ${data.points_spent} punti.`);
+      await loadHistory(customer.id);
     } catch (error) {
       console.error('Errore riscatto:', error);
       setMessage('Errore di connessione durante il riscatto.');
@@ -361,11 +378,44 @@ export default function Cassa() {
             </div>
           </div>
 
+          <div className="mt-6 border-t border-neutral-700 pt-5">
+            <h2 className="font-bold mb-3">📋 Storico cliente</h2>
+            {historyLoading ? (
+              <p className="text-xs text-gray-400">Caricamento movimenti...</p>
+            ) : history.length === 0 ? (
+              <p className="text-xs text-gray-500">Nessun movimento registrato.</p>
+            ) : (
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {history.map((item) => {
+                  const redeem = item.type === 'REDEEM';
+                  const date = new Date(item.created_at).toLocaleString('it-IT', {
+                    day: '2-digit', month: '2-digit', year: '2-digit',
+                    hour: '2-digit', minute: '2-digit'
+                  });
+                  return (
+                    <div key={item.id} className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold truncate">
+                          {redeem ? (item.reward_name || 'Premio riscattato') : item.type === 'BONUS' ? 'Bonus punti' : `Acquisto € ${Number(item.amount_spent || 0).toFixed(2).replace('.', ',')}`}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">{date}</p>
+                      </div>
+                      <span className={`text-sm font-extrabold whitespace-nowrap ${redeem ? 'text-red-300' : 'text-green-400'}`}>
+                        {redeem ? `-${item.points_spent || 0}` : `+${item.points_earned || 0}`} PTS
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => {
               setCustomer(null);
               setMessage('');
               setAmount('');
+              setHistory([]);
             }}
             className="w-full mt-4 bg-neutral-700 text-xs py-2 rounded-lg text-gray-300"
           >
