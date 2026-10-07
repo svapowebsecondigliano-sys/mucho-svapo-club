@@ -210,7 +210,7 @@ export default function Cassa() {
     return (
       <main className="min-h-screen bg-neutral-900 text-white flex items-center justify-center p-4">
         <form onSubmit={handleLogin} className="w-full max-w-sm bg-neutral-800 p-6 rounded-2xl border border-neutral-700">
-          <h1 className="text-2xl font-bold text-yellow-500 text-center mb-1">MUCHO SVAPO CLUB</h1>
+          <h1 className="text-2xl font-bold text-yellow-500 text-center mb-1">SVAPOWEB SECONDIGLIANO CLUB</h1>
           <p className="text-sm text-gray-400 text-center mb-6">Accesso Cassa riservato</p>
           {authError && <p className="mb-4 text-sm text-red-300 bg-red-950/40 border border-red-800 rounded-lg p-3">{authError}</p>}
           <label className="text-xs text-gray-400">Email operatore</label>
@@ -228,7 +228,7 @@ export default function Cassa() {
   return (
     <main className="min-h-screen bg-neutral-900 text-white p-4 flex flex-col items-center">
       <div className="w-full max-w-sm flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-yellow-500">Cassa - Mucho Svapo Club</h1>
+        <h1 className="text-xl font-bold text-yellow-500">Cassa - SVAPOWEB SECONDIGLIANO CLUB</h1>
         <button onClick={handleLogout} className="text-xs bg-neutral-700 px-3 py-2 rounded-lg text-gray-300">Esci</button>
       </div>
 
