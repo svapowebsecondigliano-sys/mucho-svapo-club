@@ -27,6 +27,13 @@ function parseEuroAmount(value) {
   return amount;
 }
 
+const REWARDS = [
+  { code: 'COTONE_DRIP', points: 60, name: 'Filtri cotone + Drip Tip' },
+  { code: 'LACCIO_COPRI_DRIP', points: 70, name: 'Laccio porta sigaretta + Copri Drip Tip' },
+  { code: 'RESISTENZE_2', points: 110, name: '2 resistenze' },
+  { code: 'SCONTO_15_DEVICE', points: 300, name: '15% sconto su dispositivo' },
+];
+
 export default function Cassa() {
   const [customer, setCustomer] = useState(null);
   const [amount, setAmount] = useState('');
@@ -38,6 +45,7 @@ export default function Cassa() {
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  const [redeeming, setRedeeming] = useState('');
 
   useEffect(() => {
     const supabase = getSupabaseClient();
@@ -202,6 +210,38 @@ export default function Cassa() {
     }
   }
 
+
+  async function handleRedeem(reward) {
+    if (!customer || redeeming || submitting) return;
+    if ((customer.points_balance ?? 0) < reward.points) return;
+
+    const confirmed = window.confirm(`Confermi il riscatto di "${reward.name}" per ${reward.points} punti?`);
+    if (!confirmed) return;
+
+    const supabase = getSupabaseClient();
+    if (!supabase) return setMessage('Supabase non è configurato correttamente.');
+
+    setRedeeming(reward.code);
+    setMessage('');
+    try {
+      const { data, error } = await supabase.rpc('redeem_reward', {
+        cust_id: customer.id,
+        reward_code: reward.code,
+      });
+      if (error) {
+        setMessage(`Errore durante il riscatto: ${error.message}`);
+        return;
+      }
+      setCustomer((previous) => ({ ...previous, points_balance: data.new_balance }));
+      setMessage(`Premio riscattato: ${data.reward}. Scalati ${data.points_spent} punti.`);
+    } catch (error) {
+      console.error('Errore riscatto:', error);
+      setMessage('Errore di connessione durante il riscatto.');
+    } finally {
+      setRedeeming('');
+    }
+  }
+
   if (session === undefined) {
     return <main className="min-h-screen bg-neutral-900 text-white flex items-center justify-center p-4">Caricamento...</main>;
   }
@@ -295,6 +335,31 @@ export default function Cassa() {
           {message && (
             <p className="text-sm text-center mt-4 text-yellow-300">{message}</p>
           )}
+
+          <div className="mt-6 border-t border-neutral-700 pt-5">
+            <h2 className="font-bold mb-3">🎁 Riscatta premio</h2>
+            <div className="space-y-2">
+              {REWARDS.map((reward) => {
+                const available = (customer.points_balance ?? 0) >= reward.points;
+                return (
+                  <button
+                    key={reward.code}
+                    type="button"
+                    disabled={!available || Boolean(redeeming) || submitting}
+                    onClick={() => handleRedeem(reward)}
+                    className={`w-full text-left rounded-xl border p-3 transition ${available ? 'border-yellow-500/60 bg-yellow-500/10 hover:bg-yellow-500/20' : 'border-neutral-700 bg-neutral-900/50 opacity-55'}`}
+                  >
+                    <div className="flex justify-between gap-3">
+                      <span className="text-sm font-semibold">{reward.name}</span>
+                      <span className={`text-xs font-bold whitespace-nowrap ${available ? 'text-yellow-400' : 'text-gray-500'}`}>
+                        {redeeming === reward.code ? 'Riscatto...' : available ? `${reward.points} PTS · Riscatta` : `Mancano ${reward.points - (customer.points_balance ?? 0)}`}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <button
             onClick={() => {
