@@ -33,8 +33,30 @@ export default function Cassa() {
   const [message, setMessage] = useState('');
   const [scannerError, setScannerError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [session, setSession] = useState(undefined);
+  const [email, setEmail] = useState('svapowebsecondigliano@gmail.com');
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setSession(null);
+      setAuthError('Supabase non è configurato correttamente.');
+      return undefined;
+    }
+
+    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!session || session.user?.email !== 'svapowebsecondigliano@gmail.com') return undefined;
     if (typeof window === 'undefined') return undefined;
 
     let scannerInstance = null;
@@ -71,7 +93,36 @@ export default function Cassa() {
         scannerInstance.clear().catch(() => {});
       }
     };
-  }, []);
+  }, [session]);
+
+  async function handleLogin(event) {
+    event.preventDefault();
+    if (authLoading) return;
+    setAuthError('');
+    if (email.trim().toLowerCase() !== 'svapowebsecondigliano@gmail.com') {
+      setAuthError('Account non autorizzato per la Cassa.');
+      return;
+    }
+    const supabase = getSupabaseClient();
+    if (!supabase) return setAuthError('Supabase non è configurato correttamente.');
+    setAuthLoading(true);
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    setAuthLoading(false);
+    if (error) return setAuthError('Email o password non corretti.');
+    if (data.user?.email !== 'svapowebsecondigliano@gmail.com') {
+      await supabase.auth.signOut();
+      return setAuthError('Account non autorizzato per la Cassa.');
+    }
+    setPassword('');
+  }
+
+  async function handleLogout() {
+    const supabase = getSupabaseClient();
+    if (supabase) await supabase.auth.signOut();
+    setCustomer(null);
+    setAmount('');
+    setMessage('');
+  }
 
   async function loadCustomer(id) {
     const supabase = getSupabaseClient();
@@ -151,9 +202,35 @@ export default function Cassa() {
     }
   }
 
+  if (session === undefined) {
+    return <main className="min-h-screen bg-neutral-900 text-white flex items-center justify-center p-4">Caricamento...</main>;
+  }
+
+  if (!session || session.user?.email !== 'svapowebsecondigliano@gmail.com') {
+    return (
+      <main className="min-h-screen bg-neutral-900 text-white flex items-center justify-center p-4">
+        <form onSubmit={handleLogin} className="w-full max-w-sm bg-neutral-800 p-6 rounded-2xl border border-neutral-700">
+          <h1 className="text-2xl font-bold text-yellow-500 text-center mb-1">MUCHO SVAPO CLUB</h1>
+          <p className="text-sm text-gray-400 text-center mb-6">Accesso Cassa riservato</p>
+          {authError && <p className="mb-4 text-sm text-red-300 bg-red-950/40 border border-red-800 rounded-lg p-3">{authError}</p>}
+          <label className="text-xs text-gray-400">Email operatore</label>
+          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-3 mt-1 mb-3" />
+          <label className="text-xs text-gray-400">Password</label>
+          <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-3 mt-1 mb-5" />
+          <button disabled={authLoading} className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-60 text-black font-bold py-3 rounded-lg">
+            {authLoading ? 'Accesso...' : 'Accedi alla Cassa'}
+          </button>
+        </form>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-neutral-900 text-white p-4 flex flex-col items-center">
-      <h1 className="text-xl font-bold text-yellow-500 mb-4">Cassa - Mucho Svapo Club</h1>
+      <div className="w-full max-w-sm flex items-center justify-between mb-4">
+        <h1 className="text-xl font-bold text-yellow-500">Cassa - Mucho Svapo Club</h1>
+        <button onClick={handleLogout} className="text-xs bg-neutral-700 px-3 py-2 rounded-lg text-gray-300">Esci</button>
+      </div>
 
       {!customer ? (
         <div className="w-full max-w-sm bg-neutral-800 p-4 rounded-xl">
