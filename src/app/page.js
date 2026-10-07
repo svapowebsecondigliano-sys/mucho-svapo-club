@@ -204,7 +204,7 @@ export default function Home() {
     return (
       <main className="min-h-screen bg-neutral-900 text-white flex flex-col items-center justify-center p-4">
         <section className="bg-neutral-800 p-6 rounded-2xl shadow-xl w-full max-w-sm text-center border border-neutral-700">
-          <h1 className="text-2xl font-bold tracking-wide text-yellow-500 mb-1">MUCHO SVAPO CLUB</h1>
+          <h1 className="text-2xl font-bold tracking-wide text-yellow-500 mb-1">SVAPOWEB SECONDIGLIANO CLUB</h1>
           <p className="text-sm text-gray-400 mb-5">Carta Fedeltà Digitale</p>
 
           {successMsg && <div className="mb-4 rounded-lg border border-green-700 bg-green-950/40 px-3 py-2 text-sm text-green-300">{successMsg}</div>}
@@ -234,7 +234,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-neutral-900 text-white flex items-center justify-center p-4">
       <section className="bg-neutral-800 p-6 rounded-2xl w-full max-w-sm border border-neutral-700">
-        <h1 className="text-2xl font-bold text-center text-yellow-500 mb-1">MUCHO SVAPO CLUB</h1>
+        <h1 className="text-2xl font-bold text-center text-yellow-500 mb-1">SVAPOWEB SECONDIGLIANO CLUB</h1>
         <p className="text-sm text-gray-400 text-center mb-6">La tua carta fedeltà digitale</p>
 
         {successMsg && <div className="mb-4 rounded-lg border border-green-700 bg-green-950/40 px-3 py-2 text-sm text-green-300">{successMsg}</div>}
