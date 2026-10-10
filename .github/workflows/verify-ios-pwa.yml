@@ -1,0 +1,23 @@
+name: Verify iPhone PWA install
+on:
+  pull_request:
+    paths:
+      - 'src/app/layout.js'
+      - 'src/app/manifest.js'
+      - 'src/app/icon.svg'
+      - 'src/app/apple-icon.js'
+      - 'src/app/InstallGuide.js'
+      - '.github/workflows/verify-ios-pwa.yml'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
