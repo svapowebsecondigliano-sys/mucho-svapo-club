@@ -48,6 +48,8 @@ export default function Cassa() {
   const [redeeming, setRedeeming] = useState('');
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [manualCardId, setManualCardId] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
@@ -94,7 +96,7 @@ export default function Cassa() {
       })
       .catch((error) => {
         console.error('Errore scanner:', error);
-        setScannerError('Impossibile avviare la fotocamera. Usa la ricerca manuale quando sarà disponibile.');
+        setScannerError('Fotocamera non disponibile. Inserisci il codice della tessera qui sotto.');
       });
 
     return () => {
@@ -148,6 +150,13 @@ export default function Cassa() {
 
   async function loadCustomer(id) {
     const supabase = getSupabaseClient();
+    const customerId = String(id ?? '').trim();
+    if (!customerId || customerId.length > 128) {
+      setMessage('Inserisci un codice tessera valido.');
+      return;
+    }
+    setLookupLoading(true);
+    setHistory([]);
 
     if (!supabase) {
       setMessage('Supabase non è configurato correttamente.');
@@ -156,22 +165,34 @@ export default function Cassa() {
 
     try {
       const { data, error } = await supabase.rpc('get_customer', {
-        p_customer_id: id,
+        p_customer_id: customerId,
       });
 
-      if (error) {
+      if (error || !data?.id) {
         console.error('Errore caricamento cliente:', error);
-        setMessage(`Cliente non trovato: ${error.message}`);
+        setMessage('Tessera non trovata. Controlla il codice e riprova.');
         return;
       }
 
       setCustomer(data);
+      setManualCardId('');
       setMessage('');
-      loadHistory(data.id);
+      await loadHistory(data.id);
     } catch (error) {
       console.error('Errore connessione:', error);
       setMessage('Errore di connessione al database.');
+    } finally {
+      setLookupLoading(false);
     }
+  }
+
+  async function refreshCustomer(id) {
+    const supabase = getSupabaseClient();
+    if (!supabase) throw new Error('Supabase non configurato');
+    const { data, error } = await supabase.rpc('get_customer', { p_customer_id: id });
+    if (error || !data?.id) throw new Error('Saldo non disponibile: ricarica la tessera per verificare i punti.');
+    setCustomer(data);
+    await loadHistory(id);
   }
 
   async function handleAddPoints(event) {
@@ -211,13 +232,13 @@ export default function Cassa() {
         return;
       }
 
-      setMessage(`Accreditati +${pointsToEarn} punti con successo!`);
-      setCustomer((previous) => ({
-        ...previous,
-        points_balance: (previous.points_balance || 0) + pointsToEarn,
-      }));
       setAmount('');
-      await loadHistory(customer.id);
+      try {
+        await refreshCustomer(customer.id);
+        setMessage(`Accreditati +${pointsToEarn} punti. Saldo aggiornato dal database.`);
+      } catch (refreshError) {
+        setMessage(`Accredito registrato, ma impossibile verificare il saldo: ${refreshError.message}`);
+      }
     } catch (error) {
       console.error('Errore inatteso accredito:', error);
       setMessage('Errore di connessione.');
@@ -248,9 +269,12 @@ export default function Cassa() {
         setMessage(`Errore durante il riscatto: ${error.message}`);
         return;
       }
-      setCustomer((previous) => ({ ...previous, points_balance: data.new_balance }));
-      setMessage(`Premio riscattato: ${data.reward}. Scalati ${data.points_spent} punti.`);
-      await loadHistory(customer.id);
+      try {
+        await refreshCustomer(customer.id);
+        setMessage(`Premio riscattato: ${data.reward}. Scalati ${data.points_spent} punti. Saldo aggiornato.`);
+      } catch (refreshError) {
+        setMessage(`Riscatto registrato, ma impossibile verificare il saldo: ${refreshError.message}`);
+      }
     } catch (error) {
       console.error('Errore riscatto:', error);
       setMessage('Errore di connessione durante il riscatto.');
@@ -304,6 +328,11 @@ export default function Cassa() {
           <p className="text-xs text-center text-gray-400 mt-2">
             Inquadra il QR Code dello smartphone del cliente
           </p>
+          <form className="mt-5 space-y-2 border-t border-neutral-700 pt-4" onSubmit={(event) => { event.preventDefault(); if (!lookupLoading) void loadCustomer(manualCardId); }}>
+            <label htmlFor="manual-card-id" className="block text-sm font-medium text-white">Oppure inserisci il codice tessera</label>
+            <input id="manual-card-id" type="text" autoComplete="off" value={manualCardId} maxLength={128} onChange={(event) => setManualCardId(event.target.value)} placeholder="Codice riportato sulla tessera" className="w-full rounded-lg border border-neutral-600 bg-neutral-900 p-3 text-white" />
+            <button type="submit" disabled={lookupLoading || !manualCardId.trim()} className="w-full rounded-lg bg-yellow-500 p-3 font-bold text-black disabled:opacity-50">{lookupLoading ? 'Ricerca...' : 'Cerca tessera'}</button>
+          </form>
         </div>
       ) : (
         <div className="w-full max-w-sm bg-neutral-800 p-6 rounded-2xl border border-neutral-700">
@@ -416,6 +445,7 @@ export default function Cassa() {
               setMessage('');
               setAmount('');
               setHistory([]);
+              setManualCardId('');
             }}
             className="w-full mt-4 bg-neutral-700 text-xs py-2 rounded-lg text-gray-300"
           >
