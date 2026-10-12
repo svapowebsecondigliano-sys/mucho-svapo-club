@@ -42,8 +42,21 @@ export default function Home() {
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
-    const savedId = localStorage.getItem('mucho_svapo_user_id');
-    if (savedId) fetchCustomer(savedId);
+    const refreshSavedCard = () => {
+      const savedId = localStorage.getItem('mucho_svapo_user_id');
+      if (savedId) void fetchCustomer(savedId);
+    };
+    refreshSavedCard();
+    // Refresh customer balance when reopening an installed PWA or returning to Safari.
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refreshSavedCard();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', refreshSavedCard);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', refreshSavedCard);
+    };
   }, []);
 
   function clearMessages() {

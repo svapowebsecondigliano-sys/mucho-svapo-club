@@ -1,0 +1,40 @@
+name: Verify loyalty cashier improvements
+on:
+  pull_request:
+    paths:
+      - 'src/app/page.js'
+      - 'src/app/cassa/page.js'
+      - '.github/workflows/verify-loyalty-cashier.yml'
+  workflow_dispatch:
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Verify point safeguards and manual lookup
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const cashier = fs.readFileSync('src/app/cassa/page.js','utf8');
+          const customer = fs.readFileSync('src/app/page.js','utf8');
+          assert.match(cashier,/Math\.floor\(parsedAmount\)/);
+          assert.match(cashier,/supabase\.rpc\('add_points'/);
+          assert.match(cashier,/supabase\.rpc\('redeem_reward'/);
+          assert.match(cashier,/manual-card-id/);
+          assert.match(cashier,/await refreshCustomer\(customer\.id\)/);
+          assert.doesNotMatch(cashier,/points_balance:\s*\(previous\.points_balance/);
+          assert.match(customer,/visibilitychange/);
+          for(const price of [60,70,110,300]){
+            assert.ok(cashier.includes('points: '+price),'Missing cashier reward '+price);
+            assert.ok(customer.includes('points: '+price),'Missing customer reward '+price);
+          }
+          console.log('Loyalty safeguards verified');
+          NODE
