@@ -155,13 +155,12 @@ export default function Cassa() {
       setMessage('Inserisci un codice tessera valido.');
       return;
     }
-    setLookupLoading(true);
-    setHistory([]);
-
     if (!supabase) {
       setMessage('Supabase non è configurato correttamente.');
       return;
     }
+    setLookupLoading(true);
+    setHistory([]);
 
     try {
       const { data, error } = await supabase.rpc('get_customer', {
