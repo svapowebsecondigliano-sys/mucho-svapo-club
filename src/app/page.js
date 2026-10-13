@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import QRCode from 'react-qr-code';
+import SaveCardButton from './SaveCardButton';
 
 function getSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -240,6 +241,8 @@ export default function Home() {
             <p className="text-xs text-gray-400 uppercase tracking-wider">Saldo Punti</p>
             <p className="text-4xl font-extrabold text-yellow-400 mt-1">{customer.points_balance ?? 0} PTS</p>
           </div>
+
+          <SaveCardButton />
 
           <p className="text-sm font-semibold text-gray-300">{customer.full_name}</p>
           <p className="text-xs text-gray-500 mb-5">{customer.phone}</p>
