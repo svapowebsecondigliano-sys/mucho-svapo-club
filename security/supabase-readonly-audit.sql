@@ -11,7 +11,10 @@ SELECT n.nspname AS schema_name,
        pg_get_userbyid(p.proowner) AS owner_name,
        p.prosecdef AS security_definer,
        p.proconfig AS function_config,
-       has_function_privilege('public', p.oid, 'EXECUTE') AS public_can_execute,
+       EXISTS (
+         SELECT 1 FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) acl
+         WHERE acl.grantee = 0 AND acl.privilege_type = 'EXECUTE'
+       ) AS public_can_execute,
        has_function_privilege('anon', p.oid, 'EXECUTE') AS anon_can_execute,
        has_function_privilege('authenticated', p.oid, 'EXECUTE') AS authenticated_can_execute
 FROM pg_proc p
