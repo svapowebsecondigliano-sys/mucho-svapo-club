@@ -1,0 +1,40 @@
+name: Verify Supabase security audit
+on:
+  pull_request:
+    paths:
+      - 'security/**'
+      - '.github/workflows/verify-security-audit.yml'
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Audit is read-only and names all customer and admin RPCs
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const sql = fs.readFileSync('security/supabase-readonly-audit.sql', 'utf8');
+          const client = ['src/app/page.js','src/app/cassa/page.js','src/app/admin/page.js']
+            .map(path => fs.readFileSync(path,'utf8')).join('\n');
+          assert.match(sql, /BEGIN TRANSACTION READ ONLY;/);
+          assert.match(sql, /ROLLBACK;/);
+          const uncommented = sql.replace(/--[^\n]*/g,'');
+          assert.doesNotMatch(uncommented, /\b(?:INSERT|UPDATE|DELETE|TRUNCATE|DROP|ALTER|CREATE|GRANT|REVOKE|CALL|DO)\b/i);
+          for(const rpc of ['add_points','redeem_reward','get_customer','create_customer',
+            'login_customer','set_customer_pin','get_customer_history','get_admin_dashboard']){
+            assert.ok(sql.includes("'"+rpc+"'"), 'Missing RPC audit: '+rpc);
+            assert.ok(client.includes("'"+rpc+"'"), 'Missing existing app RPC: '+rpc);
+          }
+          assert.match(sql, /pg_policies/);
+          assert.match(sql, /has_function_privilege/);
+          console.log('Read-only security audit and RPC inventory verified');
+          NODE
