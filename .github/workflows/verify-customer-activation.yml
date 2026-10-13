@@ -1,0 +1,42 @@
+name: Verify customer activation
+on:
+  pull_request:
+    paths:
+      - 'src/app/page.js'
+      - 'src/app/cassa/page.js'
+      - 'security/migrations/20261013_customer_activation.sql'
+      - '.github/workflows/verify-customer-activation.yml'
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Verify secure flow invariants
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const client = fs.readFileSync('src/app/page.js', 'utf8');
+          const cashier = fs.readFileSync('src/app/cassa/page.js', 'utf8');
+          const sql = fs.readFileSync('security/migrations/20261013_customer_activation.sql', 'utf8');
+          assert.match(client, /rpc\('activate_customer_pin'/);
+          assert.doesNotMatch(client, /rpc\('set_customer_pin'/);
+          assert.match(cashier, /rpc\('issue_customer_activation'/);
+          assert.match(cashier, /rpc\('find_customer_for_cashier'/);
+          assert.match(sql, /interval '15 minutes'/);
+          assert.match(sql, /attempts >= 5/);
+          assert.match(sql, /FOR UPDATE/i);
+          assert.match(sql, /gen_random_bytes\(6\)/);
+          assert.match(sql, /DELETE FROM public.customer_activations/);
+          assert.match(sql, /RETURN jsonb_build_object\('success', false/);
+          assert.match(sql, /REVOKE ALL ON TABLE public.customer_activations/);
+          console.log('Activation invariants and build verified');
+          NODE
