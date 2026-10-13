@@ -1,0 +1,42 @@
+name: Verify save-card PWA
+on:
+  pull_request:
+    paths:
+      - 'src/app/page.js'
+      - 'src/app/SaveCardButton.js'
+      - 'src/app/manifest.js'
+      - 'src/app/pwa-icon/route.js'
+      - '.github/workflows/verify-save-card-pwa.yml'
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Check install guidance and icons
+        run: |
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const assert = require('node:assert/strict');
+          const guide = fs.readFileSync('src/app/SaveCardButton.js','utf8');
+          const page = fs.readFileSync('src/app/page.js','utf8');
+          const manifest = fs.readFileSync('src/app/manifest.js','utf8');
+          const icons = fs.readFileSync('src/app/pwa-icon/route.js','utf8');
+          assert.match(guide, /beforeinstallprompt/);
+          assert.match(guide, /appinstalled/);
+          assert.match(guide, /Safari/);
+          assert.match(guide, /Chrome/);
+          assert.match(guide, /Salva la tessera sul telefono/);
+          assert.match(page, /<SaveCardButton\s*\/>/);
+          assert.match(manifest, /192x192/);
+          assert.match(manifest, /512x512/);
+          assert.match(icons, /ImageResponse/);
+          console.log('PWA install controls verified');
+          NODE
