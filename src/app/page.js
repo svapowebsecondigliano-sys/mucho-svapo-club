@@ -38,6 +38,7 @@ export default function Home() {
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
   const [pinSetupPhone, setPinSetupPhone] = useState('');
+  const [activationCode, setActivationCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -122,7 +123,7 @@ export default function Home() {
       setPinSetupPhone(cleanPhone);
       setCustomer(data);
       setMode('setupPin');
-      setSuccessMsg('Tessera creata. Ora scegli un PIN di 4 cifre.');
+      setSuccessMsg('Tessera creata. Per attivarla, chiedi alla cassa il tuo codice monouso.');
     } finally {
       setLoading(false);
     }
@@ -169,23 +170,25 @@ export default function Home() {
     if (!validPhone(targetPhone)) return setErrorMsg('Inserisci il numero associato alla tessera.');
     if (!/^\d{4}$/.test(pin)) return setErrorMsg('Scegli un PIN di 4 cifre.');
     if (pin !== pinConfirm) return setErrorMsg('I due PIN non coincidono.');
+    if (!/^[0-9A-F]{12}$/i.test(activationCode.trim())) return setErrorMsg('Inserisci il codice di attivazione di 12 caratteri fornito dalla cassa.');
 
     const supabase = getSupabaseClient();
     if (!supabase) return setErrorMsg('Il servizio tessere non è configurato correttamente.');
 
     setLoading(true);
     try {
-      const { error } = await supabase.rpc('set_customer_pin', {
+      const { data: activation, error } = await supabase.rpc('activate_customer_pin', {
         p_phone: targetPhone,
         p_pin: pin,
+        p_code: activationCode.trim().toUpperCase(),
       });
 
-      if (error) {
-        if (error.message?.includes('PIN già configurato')) {
+      if (error || !activation?.success) {
+        if (error?.message?.includes('PIN già configurato')) {
           setMode('login');
           setErrorMsg('Questa tessera ha già un PIN. Accedi con il PIN esistente.');
         } else {
-          setErrorMsg(error.message || 'Impossibile configurare il PIN.');
+          setErrorMsg(error?.message || activation?.message || 'Impossibile configurare il PIN.');
         }
         return;
       }
@@ -203,6 +206,9 @@ export default function Home() {
 
       localStorage.setItem('mucho_svapo_user_id', data.id);
       setCustomer(data);
+      setActivationCode('');
+      setPin('');
+      setPinConfirm('');
       setSuccessMsg('PIN configurato. Tessera pronta!');
       setMode('card');
     } finally {
@@ -217,6 +223,7 @@ export default function Home() {
     setPin('');
     setPinConfirm('');
     setPinSetupPhone('');
+    setActivationCode('');
     clearMessages();
     setMode('login');
   }
@@ -321,10 +328,11 @@ export default function Home() {
 
         {mode === 'setupPin' && (
           <form onSubmit={handleSetPin}>
-            <p className="text-sm text-gray-300 mb-4 text-center">Configura il tuo PIN personale</p>
+            <p className="text-sm text-gray-300 mb-4 text-center">Chiedi in cassa un codice monouso per attivare la tessera. Scade dopo 15 minuti.</p>
             {!pinSetupPhone && (
               <input type="tel" placeholder="Numero associato alla tessera" required value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-3 mb-3 focus:outline-none focus:border-yellow-500" />
             )}
+            <input type="text" autoCapitalize="characters" autoComplete="off" spellCheck={false} maxLength={12} placeholder="Codice attivazione (12 caratteri)" required value={activationCode} onChange={(e) => setActivationCode(e.target.value.replace(/[^a-fA-F0-9]/g, '').toUpperCase().slice(0, 12))} className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-3 mb-3 text-center tracking-widest focus:outline-none focus:border-yellow-500" />
             <input type="password" inputMode="numeric" maxLength={4} placeholder="Scegli PIN (4 cifre)" required value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))} className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-3 mb-3 text-center tracking-[0.4em] focus:outline-none focus:border-yellow-500" />
             <input type="password" inputMode="numeric" maxLength={4} placeholder="Ripeti PIN" required value={pinConfirm} onChange={(e) => setPinConfirm(e.target.value.replace(/\D/g, '').slice(0, 4))} className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-3 mb-5 text-center tracking-[0.4em] focus:outline-none focus:border-yellow-500" />
             <button disabled={loading} className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:opacity-60 text-black font-bold py-3 rounded-lg">

@@ -50,6 +50,10 @@ export default function Cassa() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [manualCardId, setManualCardId] = useState('');
   const [lookupLoading, setLookupLoading] = useState(false);
+  const [manualPhone, setManualPhone] = useState('');
+  const [phoneLookupLoading, setPhoneLookupLoading] = useState(false);
+  const [activationCode, setActivationCode] = useState('');
+  const [issuingActivation, setIssuingActivation] = useState(false);
 
   useEffect(() => {
     const supabase = getSupabaseClient();
@@ -134,6 +138,8 @@ export default function Cassa() {
     setCustomer(null);
     setAmount('');
     setMessage('');
+    setActivationCode('');
+    setManualPhone('');
   }
 
   async function loadHistory(customerId) {
@@ -161,6 +167,7 @@ export default function Cassa() {
     }
     setLookupLoading(true);
     setHistory([]);
+    setActivationCode('');
 
     try {
       const { data, error } = await supabase.rpc('get_customer', {
@@ -175,6 +182,7 @@ export default function Cassa() {
 
       setCustomer(data);
       setManualCardId('');
+      setManualPhone('');
       setMessage('');
       await loadHistory(data.id);
     } catch (error) {
@@ -182,6 +190,48 @@ export default function Cassa() {
       setMessage('Errore di connessione al database.');
     } finally {
       setLookupLoading(false);
+    }
+  }
+
+  async function lookupByPhone(event) {
+    event.preventDefault();
+    if (phoneLookupLoading || !manualPhone.trim()) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) return setMessage('Supabase non configurato.');
+    setPhoneLookupLoading(true);
+    setActivationCode('');
+    setMessage('');
+    setHistory([]);
+    try {
+      const { data, error } = await supabase.rpc('find_customer_for_cashier', { p_phone: manualPhone.trim() });
+      if (error || !data?.id) return setMessage('Tessera non trovata: controlla il telefono.');
+      setCustomer(data);
+      setManualPhone('');
+      await loadHistory(data.id);
+    } catch {
+      setMessage('Errore di connessione durante la ricerca.');
+    } finally {
+      setPhoneLookupLoading(false);
+    }
+  }
+
+  async function issueActivationCode() {
+    if (!customer || issuingActivation || submitting || redeeming) return;
+    if (!window.confirm('Hai verificato di persona che la tessera appartenga al cliente? Generare un nuovo codice invalida quello precedente.')) return;
+    const supabase = getSupabaseClient();
+    if (!supabase) return setMessage('Supabase non configurato.');
+    setActivationCode('');
+    setMessage('');
+    setIssuingActivation(true);
+    try {
+      const { data, error } = await supabase.rpc('issue_customer_activation', { p_customer_id: customer.id });
+      if (error || !data) return setMessage(error?.message || 'Impossibile generare il codice.');
+      setActivationCode(data);
+      setMessage('Codice creato. Consegnalo al cliente: è valido per 15 minuti e utilizzabile una sola volta.');
+    } catch {
+      setMessage('Errore durante la generazione del codice.');
+    } finally {
+      setIssuingActivation(false);
     }
   }
 
@@ -332,6 +382,11 @@ export default function Cassa() {
             <input id="manual-card-id" type="text" autoComplete="off" value={manualCardId} maxLength={128} onChange={(event) => setManualCardId(event.target.value)} placeholder="Codice riportato sulla tessera" className="w-full rounded-lg border border-neutral-600 bg-neutral-900 p-3 text-white" />
             <button type="submit" disabled={lookupLoading || !manualCardId.trim()} className="w-full rounded-lg bg-yellow-500 p-3 font-bold text-black disabled:opacity-50">{lookupLoading ? 'Ricerca...' : 'Cerca tessera'}</button>
           </form>
+          <form className="mt-4 space-y-2 border-t border-neutral-700 pt-4" onSubmit={lookupByPhone}>
+            <label htmlFor="manual-phone" className="block text-sm font-medium text-white">Oppure cerca per numero di telefono</label>
+            <input id="manual-phone" type="tel" autoComplete="off" value={manualPhone} onChange={(event) => setManualPhone(event.target.value)} placeholder="Numero di telefono del cliente" className="w-full rounded-lg border border-neutral-600 bg-neutral-900 p-3 text-white" />
+            <button type="submit" disabled={phoneLookupLoading || !manualPhone.trim()} className="w-full rounded-lg border border-yellow-600 p-3 font-bold text-yellow-400 disabled:opacity-50">{phoneLookupLoading ? 'Ricerca...' : 'Cerca per telefono'}</button>
+          </form>
         </div>
       ) : (
         <div className="w-full max-w-sm bg-neutral-800 p-6 rounded-2xl border border-neutral-700">
@@ -342,6 +397,13 @@ export default function Cassa() {
               {customer.points_balance ?? 0} PTS
             </span>
           </p>
+
+          <section className="mb-5 rounded-xl border border-yellow-500/40 bg-neutral-900 p-4">
+            <h2 className="font-bold text-yellow-400">Attivazione tessera</h2>
+            <p className="my-2 text-xs text-gray-300">Se il cliente non ha ancora un PIN, verifica di persona la sua identità e consegna un codice monouso.</p>
+            <button type="button" onClick={issueActivationCode} disabled={issuingActivation || submitting || Boolean(redeeming)} className="w-full rounded-lg bg-yellow-500 p-3 font-bold text-black disabled:opacity-60">{issuingActivation ? 'Generazione...' : 'Genera codice di attivazione'}</button>
+            {activationCode && <div role="status" className="mt-3 rounded-lg border border-yellow-500 bg-neutral-800 p-4 text-center"><p className="text-xs text-gray-400">Codice monouso valido 15 minuti</p><p className="mt-2 break-all font-mono text-2xl font-bold tracking-widest text-yellow-400">{activationCode}</p><button type="button" className="mt-3 text-xs text-gray-300 underline" onClick={() => setActivationCode('')}>Nascondi codice</button></div>}
+          </section>
 
           <form onSubmit={handleAddPoints} className="space-y-4">
             <div>
@@ -445,6 +507,8 @@ export default function Cassa() {
               setAmount('');
               setHistory([]);
               setManualCardId('');
+              setManualPhone('');
+              setActivationCode('');
             }}
             className="w-full mt-4 bg-neutral-700 text-xs py-2 rounded-lg text-gray-300"
           >
