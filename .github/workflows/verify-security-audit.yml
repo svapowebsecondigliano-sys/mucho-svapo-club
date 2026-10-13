@@ -32,7 +32,7 @@ jobs:
           for(const rpc of ['add_points','redeem_reward','get_customer','create_customer',
             'login_customer','set_customer_pin','get_customer_history','get_admin_dashboard']){
             assert.ok(sql.includes("'"+rpc+"'"), 'Missing RPC audit: '+rpc);
-            assert.ok(client.includes("'"+rpc+"'"), 'Missing existing app RPC: '+rpc);
+            assert.ok(client.includes("'"+(rpc === 'set_customer_pin' ? 'activate_customer_pin' : rpc)+"'"), 'Missing active app RPC for: '+rpc);
           }
           assert.match(sql, /pg_policies/);
           assert.match(sql, /has_function_privilege/);
