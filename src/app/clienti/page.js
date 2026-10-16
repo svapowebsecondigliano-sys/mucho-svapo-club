@@ -18,6 +18,7 @@ export default function ClientiPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
     const supabase = client();
     if (!supabase) { setSession(null); setError('Supabase non configurato'); return; }
@@ -33,13 +34,13 @@ export default function ClientiPage() {
     supabase.rpc('list_customers_for_cashier', { p_search:query, p_limit:50, p_offset:page * 50 })
       .then(({data,error:rpcError}) => {
         if(cancelled) return;
-        if(rpcError) { setError('Elenco non disponibile: verifica che la migrazione sia applicata e i permessi dell’operatore siano corretti.'); return; }
+        if(rpcError) { setItems([]); setTotal(0); setError('Impossibile leggere i clienti: ' + (rpcError.message || 'errore Supabase') + (rpcError.code ? ' (' + rpcError.code + ')' : '') + '. Torna alla Cassa e accedi nuovamente se la sessione è scaduta.'); return; }
         setItems(Array.isArray(data?.customers) ? data.customers : []);
         setTotal(Number(data?.total || 0));
       }).catch(() => { if(!cancelled) setError('Errore di connessione.'); })
       .finally(() => { if(!cancelled) setLoading(false); });
     return () => {cancelled = true;};
-  }, [session,query,page]);
+  }, [session,query,page,retry]);
   if(session === undefined) return <main className="min-h-screen bg-neutral-900 text-white p-8">Caricamento...</main>;
   if(!session || session.user?.email !== ADMIN_EMAIL) return <main className="min-h-screen bg-neutral-900 text-white p-8"><h1 className="text-2xl text-yellow-400 font-bold">Gestione clienti</h1><p className="my-4">Accesso riservato all’operatore. Accedi prima dalla Cassa.</p><Link href="/cassa" className="underline text-yellow-400">Vai alla Cassa</Link></main>;
   return <main className="min-h-screen bg-neutral-900 text-white p-4 md:p-8">
@@ -50,13 +51,14 @@ export default function ClientiPage() {
         <input aria-label="Cerca nome, telefono o numero tessera" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome, telefono o numero tessera" className="w-full p-3 bg-neutral-800 border border-neutral-600 rounded-lg"/>
         <button className="bg-yellow-500 text-black font-bold px-4 rounded-lg">Cerca</button>
       </form>
-      {error && <p role="alert" className="bg-red-950 border border-red-700 p-3 rounded-lg mb-4">{error}</p>}
+      {error && <div role="alert" className="bg-red-950 border border-red-700 p-3 rounded-lg mb-4"><p>{error}</p><button onClick={()=>setRetry(n=>n+1)} className="mt-2 bg-red-800 px-3 py-2 rounded">Riprova caricamento</button></div>}
       <p className="mb-3 text-sm text-neutral-400">{loading ? 'Caricamento...' : total + ' clienti trovati'}</p>
       <div className="overflow-x-auto rounded-lg border border-neutral-700">
         <table className="w-full text-left text-sm"><thead className="bg-neutral-800"><tr><th className="p-3">Cliente</th><th className="p-3">Telefono</th><th className="p-3">Numero tessera</th><th className="p-3 text-right">Punti</th></tr></thead>
         <tbody>{items.map(c=><tr key={c.id} className="border-t border-neutral-700"><td className="p-3">{c.full_name}</td><td className="p-3">{c.phone}</td><td className="p-3 font-mono text-xs break-all">{c.id}</td><td className="p-3 text-right font-bold text-yellow-400">{c.points_balance ?? 0}</td></tr>)}</tbody></table>
       </div>
-      {!loading && !error && items.length === 0 && <p className="p-5 text-neutral-400">Nessun cliente trovato.</p>}
+      {!loading && !error && items.length === 0 && <p className="p-5 text-neutral-400">{query ? 'Nessun cliente corrisponde alla ricerca. Cancella il filtro e riprova.' : 'Non sono stati restituiti clienti. Premi Riprova caricamento o verifica la sessione.'}</p>}
+      {!loading && !error && <button className="mt-3 text-yellow-400 underline" onClick={()=>setRetry(n=>n+1)}>Aggiorna elenco</button>}
       <div className="flex justify-between items-center mt-5">
         <button disabled={page===0 || loading} onClick={()=>setPage(p=>p-1)} className="bg-neutral-700 px-4 py-2 rounded disabled:opacity-40">Precedenti</button>
         <span className="text-sm text-neutral-400">Pagina {page+1} / {Math.max(1,Math.ceil(total/50))}</span>
