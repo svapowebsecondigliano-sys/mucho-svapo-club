@@ -359,6 +359,7 @@ export default function Cassa() {
     <main className="min-h-screen bg-neutral-900 text-white p-4 flex flex-col items-center">
       <div className="w-full max-w-sm flex items-center justify-between mb-4">
         <h1 className="text-xl font-bold text-yellow-500">Cassa - SVAPOWEB SECONDIGLIANO CLUB</h1>
+        <a href="/clienti" className="text-xs bg-yellow-500 text-black font-bold px-3 py-2 rounded-lg">Gestione Clienti</a>
         <button onClick={handleLogout} className="text-xs bg-neutral-700 px-3 py-2 rounded-lg text-gray-300">Esci</button>
       </div>
 
